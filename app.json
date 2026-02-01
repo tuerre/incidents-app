@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "fluxo-mobile",
-    "slug": "fluxo-mobile",
+    "name": "incidents-app",
+    "slug": "incidents-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -38,7 +38,11 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "@react-native-community/datetimepicker",
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,
