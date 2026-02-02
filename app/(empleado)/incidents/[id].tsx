@@ -1,6 +1,7 @@
 import { AppText } from "@/components/AppText";
 import { ResolveIncidentBottomSheet } from "@/components/ResolveIncidentBottomSheet";
 import { ScreenPattern } from "@/components/ui/ScreenPattern";
+import { useDateFormat } from "@/hooks/use-date-format";
 import { supabase } from "@/src/services/supabase";
 import { router, useLocalSearchParams } from "expo-router";
 import { Trash2, Wrench } from "lucide-react-native";
@@ -52,18 +53,6 @@ const statusConfig: Record<string, { label: string }> = {
   resuelta: { label: "Resuelta" },
 };
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
 export default function IncidentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -71,6 +60,17 @@ export default function IncidentDetailScreen() {
   const [actionLoading, setActionLoading] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showResolveModal, setShowResolveModal] = useState(false);
+  const { formatDateTime } = useDateFormat();
+  const [signedImages, setSignedImages] = useState<Record<string, string>>({});
+
+  const getSignedImageUrl = async (path: string) => {
+    const { data, error } = await supabase.storage
+      .from("incident-evidence")
+      .createSignedUrl(path, 60 * 60);
+
+    if (error) return null;
+    return data.signedUrl;
+  };
 
   useEffect(() => {
     loadIncident();
@@ -102,6 +102,16 @@ export default function IncidentDetailScreen() {
 
       if (error) throw error;
       setIncident(data);
+      if (data.incident_evidence?.length) {
+        const entries = await Promise.all(
+          data.incident_evidence.map(async (e: any) => {
+            const signedUrl = await getSignedImageUrl(e.image_url);
+            return [e.image_url, signedUrl];
+          }),
+        );
+
+        setSignedImages(Object.fromEntries(entries.filter(([, v]) => v)));
+      }
     } catch (e: any) {
       Alert.alert("Error", e.message ?? "Error cargando incidencia");
       router.back();
@@ -114,7 +124,6 @@ export default function IncidentDetailScreen() {
     try {
       setActionLoading(true);
 
-      // Verificar que la incidencia sigue pendiente
       const { data: currentIncident, error: fetchError } = await supabase
         .from("incidents")
         .select("status")
@@ -137,7 +146,6 @@ export default function IncidentDetailScreen() {
         return;
       }
 
-      // Actualizar la incidencia
       const { error: updateError } = await supabase
         .from("incidents")
         .update({
@@ -273,7 +281,6 @@ export default function IncidentDetailScreen() {
     >
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          {/* Título y Badge de Estado */}
           <View style={styles.headerSection}>
             <AppText style={styles.title}>{incident.title}</AppText>
             <TouchableOpacity
@@ -323,7 +330,6 @@ export default function IncidentDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Descripción del Problema */}
           <View style={styles.section}>
             <AppText style={styles.sectionTitle}>
               DESCRIPCIÓN DEL PROBLEMA
@@ -333,7 +339,6 @@ export default function IncidentDetailScreen() {
             </AppText>
           </View>
 
-          {/* Información de ubicación */}
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
               <View style={styles.iconContainer}>
@@ -392,13 +397,12 @@ export default function IncidentDetailScreen() {
               <View style={styles.infoContent}>
                 <AppText style={styles.infoLabel}>Fecha de Reporte</AppText>
                 <AppText style={styles.infoValue}>
-                  {formatDate(incident.created_at)}
+                  {formatDateTime(incident.created_at)}
                 </AppText>
               </View>
             </View>
           </View>
 
-          {/* Resolution Details Section - Only for resolved incidents */}
           {incident.status === "resuelta" &&
             incident.incident_resolutions &&
             incident.incident_resolutions.length > 0 && (
@@ -408,7 +412,6 @@ export default function IncidentDetailScreen() {
                 </AppText>
 
                 <View style={styles.resolutionCard}>
-                  {/* Resolution Description */}
                   <View style={styles.resolutionItem}>
                     <AppText style={styles.resolutionLabel}>
                       Descripción de la Solución
@@ -418,17 +421,17 @@ export default function IncidentDetailScreen() {
                     </AppText>
                   </View>
 
-                  {/* Resolution Date */}
                   <View style={styles.resolutionItem}>
                     <AppText style={styles.resolutionLabel}>
                       Fecha de Resolución
                     </AppText>
                     <AppText style={styles.resolutionValue}>
-                      {formatDate(incident.incident_resolutions[0].created_at)}
+                      {formatDateTime(
+                        incident.incident_resolutions[0].created_at,
+                      )}
                     </AppText>
                   </View>
 
-                  {/* Evidence Images */}
                   {incident.incident_evidence &&
                     incident.incident_evidence.length > 0 && (
                       <View style={styles.resolutionItem}>
@@ -439,8 +442,11 @@ export default function IncidentDetailScreen() {
                           {incident.incident_evidence.map((evidence, index) => (
                             <Image
                               key={index}
-                              source={{ uri: evidence.image_url }}
+                              source={{
+                                uri: signedImages[evidence.image_url],
+                              }}
                               style={styles.evidenceImage}
+                              resizeMode="cover"
                             />
                           ))}
                         </View>
@@ -716,9 +722,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   evidenceImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: "100%",
+    height: 150,
+    borderRadius: 15,
     backgroundColor: "#F3F4F6",
   },
 });

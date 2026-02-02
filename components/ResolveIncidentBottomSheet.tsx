@@ -1,22 +1,22 @@
 import { AppText } from "@/components/AppText";
 import { supabase } from "@/src/services/supabase";
 import * as ImagePicker from "expo-image-picker";
-import { Camera, Image as ImageIcon, X } from "lucide-react-native";
+import { Camera, X } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    Keyboard,
-    Modal,
-    PanResponder,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Keyboard,
+  Modal,
+  PanResponder,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -45,6 +45,7 @@ export const ResolveIncidentBottomSheet = ({
   const translateY = useRef(
     new Animated.Value(SCREEN_HEIGHT - MIN_SHEET_HEIGHT),
   ).current;
+
   const sheetHeight = useRef(MIN_SHEET_HEIGHT);
   const descriptionInputRef = useRef<TextInput>(null);
 
@@ -62,11 +63,9 @@ export const ResolveIncidentBottomSheet = ({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dy) > 5;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        const newY = SCREEN_HEIGHT - sheetHeight.current + gestureState.dy;
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+      onPanResponderMove: (_, g) => {
+        const newY = SCREEN_HEIGHT - sheetHeight.current + g.dy;
         if (
           newY >= SCREEN_HEIGHT - MAX_SHEET_HEIGHT &&
           newY <= SCREEN_HEIGHT - MIN_SHEET_HEIGHT
@@ -74,28 +73,18 @@ export const ResolveIncidentBottomSheet = ({
           translateY.setValue(newY);
         }
       },
-      onPanResponderRelease: (_, gestureState) => {
-        // @ts-ignore - accessing internal value
-        const currentHeight = SCREEN_HEIGHT - translateY._value;
-        const velocity = gestureState.vy;
-
-        if (velocity > 0.5 || gestureState.dy > 100) {
-          // Swipe down - close or minimize
-          if (currentHeight > MIN_SHEET_HEIGHT * 1.5) {
-            expandToHeight(MIN_SHEET_HEIGHT);
-          } else {
-            handleClose();
-          }
-        } else if (velocity < -0.5 || gestureState.dy < -100) {
-          // Swipe up - expand
+      onPanResponderRelease: (_, g) => {
+        const currentHeight = SCREEN_HEIGHT - (translateY as any)._value;
+        if (g.vy > 0.5 || g.dy > 100) {
+          currentHeight > MIN_SHEET_HEIGHT * 1.5
+            ? expandToHeight(MIN_SHEET_HEIGHT)
+            : handleClose();
+        } else if (g.vy < -0.5 || g.dy < -100) {
           expandToHeight(MAX_SHEET_HEIGHT);
         } else {
-          // Snap to nearest position
-          if (currentHeight < (MIN_SHEET_HEIGHT + MAX_SHEET_HEIGHT) / 2) {
-            expandToHeight(MIN_SHEET_HEIGHT);
-          } else {
-            expandToHeight(MAX_SHEET_HEIGHT);
-          }
+          currentHeight < (MIN_SHEET_HEIGHT + MAX_SHEET_HEIGHT) / 2
+            ? expandToHeight(MIN_SHEET_HEIGHT)
+            : expandToHeight(MAX_SHEET_HEIGHT);
         }
       },
     }),
@@ -131,186 +120,91 @@ export const ResolveIncidentBottomSheet = ({
     sheetHeight.current = MIN_SHEET_HEIGHT;
   };
 
-  const handleInputFocus = () => {
-    if (sheetHeight.current < MAX_SHEET_HEIGHT * 0.8) {
-      expandToHeight(MAX_SHEET_HEIGHT);
-    }
-  };
-
   const handleAddImage = async (source: "camera" | "gallery") => {
-    try {
-      let result;
-
-      if (source === "camera") {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          setGeneralError("Se requiere permiso para usar la cámara");
-          return;
-        }
-
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-          allowsEditing: true,
-        });
-      } else {
-        const permission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!permission.granted) {
-          setGeneralError("Se requiere permiso para acceder a la galería");
-          return;
-        }
-
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-          allowsEditing: true,
-          allowsMultipleSelection: false,
-        });
-      }
-
-      if (!result.canceled && result.assets[0]) {
-        setImages([...images, result.assets[0].uri]);
-        setGeneralError("");
-      }
-    } catch (error: any) {
-      setGeneralError("Error al seleccionar imagen: " + error.message);
+    let result;
+    if (source === "camera") {
+      const p = await ImagePicker.requestCameraPermissionsAsync();
+      if (!p.granted) return;
+      result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+    } else {
+      const p = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!p.granted) return;
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+    }
+    if (!result.canceled) {
+      setImages((prev) => [...prev, result.assets[0].uri]);
     }
   };
 
-  const showImageOptions = () => {
-    // Simple inline options
-    // In production, you might want a proper action sheet
-  };
+  const uploadImage = async (uri: string) => {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) throw new Error("No auth");
 
-  const removeImage = (index: number) => {
-    setImages(images.filter((_, i) => i !== index));
-  };
+    const ext = uri.split(".").pop() ?? "jpg";
+    const filePath = `${data.user.id}/${Date.now()}.${ext}`;
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    try {
-      const fileName = `incident_${incidentId}_${Date.now()}.jpg`;
-      const formData = new FormData();
+    const res = await fetch(uri);
+    const arrayBuffer = await res.arrayBuffer();
 
-      // @ts-ignore
-      formData.append("file", {
-        uri,
-        type: "image/jpeg",
-        name: fileName,
+    const { error } = await supabase.storage
+      .from("incident-evidence")
+      .upload(filePath, arrayBuffer, {
+        contentType: `image/${ext}`,
+        upsert: false,
       });
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No hay usuario autenticado");
+    if (error) throw error;
 
-      // Upload to Supabase Storage
-      const fileExt = uri.split(".").pop();
-      const filePath = `${user.id}/${Date.now()}.${fileExt}`;
-
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      const { data, error } = await supabase.storage
-        .from("incident-evidence")
-        .upload(filePath, blob, {
-          contentType: "image/jpeg",
-        });
-
-      if (error) throw error;
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("incident-evidence").getPublicUrl(data.path);
-
-      return publicUrl;
-    } catch (error: any) {
-      console.error("Error uploading image:", error);
-      return null;
-    }
+    return filePath;
   };
 
   const handleSubmit = async () => {
-    // Reset errors
-    setDescriptionError("");
-    setGeneralError("");
-
-    // Validate
     if (!description.trim()) {
-      setDescriptionError("Por favor describe la solución aplicada");
-      return;
-    }
-
-    if (description.trim().length < 10) {
-      setDescriptionError("La descripción debe tener al menos 10 caracteres");
+      setDescriptionError("Escribe algo real");
       return;
     }
 
     try {
       setUploading(true);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("No hay usuario autenticado");
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error("No auth");
 
-      // 1. Create resolution record
-      const { data: resolution, error: resolutionError } = await supabase
+      const { data: resolution } = await supabase
         .from("incident_resolutions")
         .insert({
           incident_id: incidentId,
-          resolved_by: user.id,
+          resolved_by: data.user.id,
           description: description.trim(),
         })
         .select()
         .single();
 
-      if (resolutionError) throw resolutionError;
-
-      // 2. Upload images if any
-      if (images.length > 0) {
-        const uploadPromises = images.map((uri) => uploadImage(uri));
-        const uploadedUrls = await Promise.all(uploadPromises);
-
-        // Filter out failed uploads
-        const validUrls = uploadedUrls.filter((url) => url !== null);
-
-        // Insert evidence records
-        if (validUrls.length > 0) {
-          const evidenceRecords = validUrls.map((url) => ({
+      if (images.length) {
+        const paths = await Promise.all(images.map(uploadImage));
+        await supabase.from("incident_evidence").insert(
+          paths.map((p) => ({
             incident_id: incidentId,
-            image_url: url!,
-          }));
-
-          const { error: evidenceError } = await supabase
-            .from("incident_evidence")
-            .insert(evidenceRecords);
-
-          if (evidenceError) {
-            console.error("Error saving evidence:", evidenceError);
-            // Don't fail the whole operation if evidence fails
-          }
-        }
+            image_url: p,
+          })),
+        );
       }
 
-      // 3. Update incident status
-      const { error: updateError } = await supabase
+      await supabase
         .from("incidents")
-        .update({
-          status: "resuelta",
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: "resuelta" })
         .eq("id", incidentId);
 
-      if (updateError) throw updateError;
-
-      // Success
       handleClose();
       onSuccess();
-    } catch (error: any) {
-      setGeneralError(
-        error.message || "Error al resolver la incidencia. Intenta nuevamente.",
-      );
+    } catch (e: any) {
+      setGeneralError(e.message);
     } finally {
       setUploading(false);
     }
@@ -319,144 +213,55 @@ export const ResolveIncidentBottomSheet = ({
   if (!visible) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-    >
+    <Modal visible transparent animationType="none">
       <View style={styles.modalOverlay}>
         <Pressable style={styles.backdrop} onPress={handleClose} />
-
         <Animated.View
-          style={[
-            styles.sheetContainer,
-            {
-              transform: [{ translateY }],
-            },
-          ]}
+          style={[styles.sheetContainer, { transform: [{ translateY }] }]}
         >
-          {/* Drag Handle */}
           <View style={styles.handleContainer} {...panResponder.panHandlers}>
             <View style={styles.handle} />
           </View>
 
-          <ScrollView
-            style={styles.sheetContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View>
-                <AppText style={styles.title}>Resolver Incidencia</AppText>
-                <AppText style={styles.subtitle}>
-                  Completa los detalles de la solución
-                </AppText>
-              </View>
-            </View>
+          <ScrollView style={styles.sheetContent}>
+            <TextInput
+              ref={descriptionInputRef}
+              style={styles.textArea}
+              multiline
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Describe la solución"
+            />
 
-            {/* General Error */}
-            {generalError ? (
-              <View style={styles.errorContainer}>
-                <AppText style={styles.errorText}>{generalError}</AppText>
-              </View>
-            ) : null}
-
-            {/* Description Input */}
-            <View style={styles.inputSection}>
-              <AppText style={styles.label}>
-                Comentario <AppText style={styles.required}>*</AppText>
-              </AppText>
-              <TextInput
-                ref={descriptionInputRef}
-                style={[
-                  styles.textArea,
-                  descriptionError ? styles.inputError : null,
-                ]}
-                placeholder="Describe la reparación..."
-                placeholderTextColor="#94A3B8"
-                multiline
-                numberOfLines={4}
-                value={description}
-                onChangeText={(text) => {
-                  setDescription(text);
-                  if (descriptionError) setDescriptionError("");
-                }}
-                onFocus={handleInputFocus}
-                editable={!uploading}
-              />
-              {descriptionError ? (
-                <AppText style={styles.fieldError}>{descriptionError}</AppText>
-              ) : null}
-            </View>
-
-            {/* Evidence Section */}
-            <View style={styles.evidenceSection}>
-              <AppText style={styles.label}>Evidencia (opcional)</AppText>
-
-              {/* Image Grid */}
-              {images.length > 0 && (
-                <View style={styles.imageGrid}>
-                  {images.map((uri, index) => (
-                    <View key={index} style={styles.imageContainer}>
-                      <Image source={{ uri }} style={styles.image} />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => removeImage(index)}
-                        disabled={uploading}
-                      >
-                        <X size={16} color="#FFF" strokeWidth={3} />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
+            <View style={styles.imageGrid}>
+              {images.map((uri, i) => (
+                <View key={i} style={styles.imageContainer}>
+                  <Image source={{ uri }} style={styles.image} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setImages(images.filter((_, x) => x !== i))}
+                  >
+                    <X size={14} color="#fff" />
+                  </TouchableOpacity>
                 </View>
-              )}
-
-              {/* Add Image Buttons */}
-              <View style={styles.addImageButtons}>
-                <TouchableOpacity
-                  style={styles.addImageButton}
-                  onPress={() => handleAddImage("camera")}
-                  disabled={uploading}
-                >
-                  <Camera size={20} color="#2563EB" strokeWidth={2} />
-                  <AppText style={styles.addImageButtonText}>
-                    Abrir cámara
-                  </AppText>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.addImageButton}
-                  onPress={() => handleAddImage("gallery")}
-                  disabled={uploading}
-                >
-                  <ImageIcon size={20} color="#2563EB" strokeWidth={2} />
-                  <AppText style={styles.addImageButtonText}>Galería</AppText>
-                </TouchableOpacity>
-              </View>
+              ))}
             </View>
 
-            {/* Submit Button */}
+            <TouchableOpacity onPress={() => handleAddImage("camera")}>
+              <Camera size={20} />
+            </TouchableOpacity>
+
             <TouchableOpacity
-              style={[
-                styles.submitButton,
-                uploading && styles.submitButtonDisabled,
-              ]}
+              style={styles.submitButton}
               onPress={handleSubmit}
               disabled={uploading}
             >
               {uploading ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator color="#fff" />
               ) : (
-                <AppText style={styles.submitButtonText}>
-                  Marcar como resuelta
-                </AppText>
+                <AppText style={styles.submitButtonText}>Resolver</AppText>
               )}
             </TouchableOpacity>
-
-            {/* Bottom Padding */}
-            <View style={{ height: 40 }} />
           </ScrollView>
         </Animated.View>
       </View>
@@ -465,172 +270,43 @@ export const ResolveIncidentBottomSheet = ({
 };
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  backdrop: {
-    flex: 1,
-  },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,.5)" },
+  backdrop: { flex: 1 },
   sheetContainer: {
     position: "absolute",
+    bottom: 0,
     left: 0,
     right: 0,
-    bottom: 0,
     height: SCREEN_HEIGHT,
-    backgroundColor: "#FFF",
+    backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
   },
-  handleContainer: {
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#CBD5E1",
-    borderRadius: 2,
-  },
-  sheetContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: "PoppinsBold",
-    color: "#1F2937",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: "PoppinsRegular",
-    color: "#6B7280",
-  },
-  errorContainer: {
-    backgroundColor: "#FEE2E2",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    fontSize: 13,
-    fontFamily: "PoppinsMedium",
-    color: "#DC2626",
-  },
-  inputSection: {
-    marginBottom: 24,
-  },
-  label: {
-    fontSize: 14,
-    fontFamily: "PoppinsSemiBold",
-    color: "#334155",
-    marginBottom: 8,
-  },
-  required: {
-    color: "#EF4444",
-  },
+  handleContainer: { alignItems: "center", padding: 12 },
+  handle: { width: 40, height: 4, backgroundColor: "#ccc" },
+  sheetContent: { padding: 20 },
   textArea: {
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
+    borderWidth: 1,
+    borderColor: "#ddd",
     borderRadius: 12,
     padding: 12,
-    fontSize: 15,
-    fontFamily: "PoppinsRegular",
-    color: "#1F2937",
     minHeight: 100,
-    textAlignVertical: "top",
   },
-  inputError: {
-    borderColor: "#EF4444",
-    backgroundColor: "#FEF2F2",
-  },
-  fieldError: {
-    fontSize: 12,
-    fontFamily: "PoppinsMedium",
-    color: "#EF4444",
-    marginTop: 6,
-  },
-  evidenceSection: {
-    marginBottom: 24,
-  },
-  imageGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 12,
-  },
-  imageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-  },
+  imageGrid: { flexDirection: "row", gap: 12, marginVertical: 12 },
+  imageContainer: { width: 100, height: 100 },
+  image: { width: "100%", height: "100%" },
   removeImageButton: {
     position: "absolute",
     top: 4,
     right: 4,
-    backgroundColor: "#EF4444",
-    width: 24,
-    height: 24,
+    backgroundColor: "red",
     borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addImageButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  addImageButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#EFF6FF",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#DBEAFE",
-  },
-  addImageButtonText: {
-    fontSize: 14,
-    fontFamily: "PoppinsSemiBold",
-    color: "#2563EB",
   },
   submitButton: {
-    backgroundColor: "#226ceb",
-    paddingVertical: 16,
-    borderRadius: 115,
+    backgroundColor: "#2563EB",
+    padding: 16,
+    borderRadius: 999,
     alignItems: "center",
-    marginTop: 8,
-    shadowColor: "#005eff",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 10,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontFamily: "PoppinsSemiBold",
-    color: "#FFF",
-  },
+  submitButtonText: { color: "#fff", fontSize: 16 },
 });

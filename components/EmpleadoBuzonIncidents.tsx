@@ -1,16 +1,17 @@
 import { AppText } from "@/components/AppText";
 import { EmptyState } from "@/components/EmptyState";
+import { useDateFormat } from "@/hooks/use-date-format";
 import { supabase } from "@/src/services/supabase";
 import { router, useFocusEffect } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  Alert,
+  Animated,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Incident = {
@@ -158,6 +159,10 @@ export const EmpleadoBuzonIncidents = () => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"pendientes" | "en-proceso">(
+    "pendientes",
+  );
+  const { formatDateShort } = useDateFormat();
 
   useEffect(() => {
     loadIncidents();
@@ -217,17 +222,6 @@ export const EmpleadoBuzonIncidents = () => {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
   const renderIncident = ({ item }: { item: Incident }) => {
     const priorityInfo = priorityConfig[item.priority];
 
@@ -261,7 +255,9 @@ export const EmpleadoBuzonIncidents = () => {
             <AppText style={styles.roomText}>
               Habitación {item.rooms?.room_code || "---"}
             </AppText>
-            <AppText style={styles.date}>{formatDate(item.created_at)}</AppText>
+            <AppText style={styles.date}>
+              {formatDateShort(item.created_at)}
+            </AppText>
           </View>
           <View style={styles.acceptButton}>
             <AppText style={styles.acceptButtonText}>Aceptar Tarea</AppText>

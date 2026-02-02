@@ -1,5 +1,6 @@
 import { AppText } from "@/components/AppText";
 import { ModalSheet } from "@/components/settings/ModalSheet";
+import { useDateFormat } from "@/hooks/use-date-format";
 import { supabase } from "@/src/services/supabase";
 import * as SecureStore from "expo-secure-store";
 import React, { useState } from "react";
@@ -37,6 +38,7 @@ export const StayInfoModal = ({
     checkOut: "",
     loading: false,
   });
+  const { formatDate } = useDateFormat();
 
   React.useEffect(() => {
     if (visible) {
@@ -78,16 +80,8 @@ export const StayInfoModal = ({
 
       setStayInfo({
         incidentsCount: incidents?.length || 0,
-        checkIn: new Date(createdAt).toLocaleDateString("es-ES", {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        }),
-        checkOut: new Date(expiresAt).toLocaleDateString("es-ES", {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        }),
+        checkIn: formatDate(createdAt),
+        checkOut: formatDate(expiresAt),
         loading: false,
       });
     } catch (error: any) {

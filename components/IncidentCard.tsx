@@ -1,4 +1,5 @@
 import { AppText } from "@/components/AppText";
+import { useDateFormat } from "@/hooks/use-date-format";
 import { router } from "expo-router";
 import React from "react";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
@@ -36,18 +37,6 @@ const statusConfig: Record<
   resuelta: { label: "Resuelta", color: "#10b98119", textColor: "#10b981c3" },
 };
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
 type IncidentCardProps = {
   incident: Incident;
   onPress?: () => void;
@@ -59,6 +48,7 @@ export const IncidentCard = ({
   onPress,
   disabled = false,
 }: IncidentCardProps) => {
+  const { formatDateTime } = useDateFormat();
   const priorityInfo = priorityConfig[incident.priority];
   const statusInfo = statusConfig[incident.status] || {
     label: incident.status,
@@ -124,7 +114,11 @@ export const IncidentCard = ({
             </AppText>
           </View>
         </View>
-        <AppText style={styles.date}>{formatDate(incident.created_at)}</AppText>
+        <View>
+          <AppText style={styles.date}>
+            {formatDateTime(incident.created_at)}
+          </AppText>
+        </View>
       </View>
     </CardWrapper>
   );
@@ -174,9 +168,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   cardFooter: {
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "space-between",
-    alignItems: "center",
+    gap: 6,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: "#F1F5F9",

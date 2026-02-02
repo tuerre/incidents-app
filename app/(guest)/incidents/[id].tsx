@@ -1,15 +1,16 @@
 import { AppText } from "@/components/AppText";
 import { ScreenPattern } from "@/components/ui/ScreenPattern";
+import { useDateFormat } from "@/hooks/use-date-format";
 import { supabase } from "@/src/services/supabase";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    View,
 } from "react-native";
 
 type Incident = {
@@ -47,22 +48,23 @@ const statusConfig: Record<string, { label: string }> = {
   resuelta: { label: "Resuelta" },
 };
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
-
 export default function GuestIncidentDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
+  const { formatDateTime } = useDateFormat();
+
+  const getPublicImageUrl = (url: string) => {
+    // Si la URL ya es completa (comienza con http), devolverla tal cual
+    if (url.startsWith("http")) {
+      return url;
+    }
+    // Si es una ruta relativa, construir la URL pública
+    const { data } = supabase.storage
+      .from("incident-evidence")
+      .getPublicUrl(url);
+    return data.publicUrl;
+  };
 
   useEffect(() => {
     loadIncident();
@@ -235,7 +237,7 @@ export default function GuestIncidentDetailScreen() {
               <View style={styles.infoContent}>
                 <AppText style={styles.infoLabel}>Fecha de Reporte</AppText>
                 <AppText style={styles.infoValue}>
-                  {formatDate(incident.created_at)}
+                  {formatDateTime(incident.created_at)}
                 </AppText>
               </View>
             </View>
@@ -267,7 +269,9 @@ export default function GuestIncidentDetailScreen() {
                       Fecha de Resolución
                     </AppText>
                     <AppText style={styles.resolutionValue}>
-                      {formatDate(incident.incident_resolutions[0].created_at)}
+                      {formatDateTime(
+                        incident.incident_resolutions[0].created_at,
+                      )}
                     </AppText>
                   </View>
 
@@ -282,8 +286,11 @@ export default function GuestIncidentDetailScreen() {
                           {incident.incident_evidence.map((evidence, index) => (
                             <Image
                               key={index}
-                              source={{ uri: evidence.image_url }}
+                              source={{
+                                uri: getPublicImageUrl(evidence.image_url),
+                              }}
                               style={styles.evidenceImage}
+                              resizeMode="cover"
                             />
                           ))}
                         </View>

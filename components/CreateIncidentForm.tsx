@@ -5,11 +5,13 @@ import { Check, ChevronDown } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
@@ -92,197 +94,204 @@ export const CreateIncidentForm = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.inputGroup}>
-        <AppText style={styles.label}>Título</AppText>
-        <TextInput
-          style={styles.input}
-          value={title}
-          onChangeText={setTitle}
-          placeholderTextColor={"#94A3B8"}
-          placeholder="Ej: Aire no enfría"
-        />
-      </View>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <View style={styles.inputGroup}>
+          <AppText style={styles.label}>Título</AppText>
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholderTextColor={"#94A3B8"}
+            placeholder="Ej: Aire no enfría"
+          />
+        </View>
 
-      <View style={styles.inputGroup}>
-        <AppText style={styles.label}>Prioridad</AppText>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setOpen(true)}
-          activeOpacity={0.7}
-        >
-          {priority ? (
-            <View style={styles.selectedOption}>
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor: priorityOptions.find(
-                      (p) => p.value === priority,
-                    )?.bgColor,
-                  },
-                ]}
-              >
-                <AppText
+        <View style={styles.inputGroup}>
+          <AppText style={styles.label}>Prioridad</AppText>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setOpen(true)}
+            activeOpacity={0.7}
+          >
+            {priority ? (
+              <View style={styles.selectedOption}>
+                <View
                   style={[
-                    styles.badgeText,
+                    styles.badge,
                     {
-                      color: priorityOptions.find((p) => p.value === priority)
-                        ?.color,
+                      backgroundColor: priorityOptions.find(
+                        (p) => p.value === priority,
+                      )?.bgColor,
                     },
                   ]}
                 >
-                  {priorityOptions.find((p) => p.value === priority)?.label}
-                </AppText>
+                  <AppText
+                    style={[
+                      styles.badgeText,
+                      {
+                        color: priorityOptions.find((p) => p.value === priority)
+                          ?.color,
+                      },
+                    ]}
+                  >
+                    {priorityOptions.find((p) => p.value === priority)?.label}
+                  </AppText>
+                </View>
               </View>
-            </View>
-          ) : (
-            <AppText style={styles.placeholder}>
-              Selecciona la prioridad
-            </AppText>
-          )}
-          <ChevronDown
-            size={20}
-            color="#94A3B8"
-            style={[styles.chevron, open && styles.chevronOpen]}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <AppText style={styles.label}>Tipo de Incidencia</AppText>
-        <TouchableOpacity
-          style={styles.selectButton}
-          onPress={() => setOpenArea(true)}
-          activeOpacity={0.7}
-        >
-          {areaId ? (
-            <View style={styles.selectedOption}>
-              <AppText style={styles.selectedText}>
-                {(() => {
-                  const area = areas.find((a) => a.id === areaId);
-                  return area
-                    ? area.name.charAt(0).toUpperCase() + area.name.slice(1)
-                    : "";
-                })()}
-              </AppText>
-            </View>
-          ) : (
-            <AppText style={styles.placeholder}>Selecciona el área</AppText>
-          )}
-          <ChevronDown
-            size={20}
-            color="#94A3B8"
-            style={[styles.chevron, openArea && styles.chevronOpen]}
-          />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.inputGroup}>
-        <AppText style={styles.label}>Descripción</AppText>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.button, loading && { opacity: 0.6 }]}
-        onPress={handleSubmit}
-        disabled={loading}
-      >
-        <AppText style={styles.buttonText}>
-          {loading ? "Enviando..." : "Reportar Incidencia"}
-        </AppText>
-      </TouchableOpacity>
-
-      <Modal visible={open} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-          <View style={styles.dropdown}>
-            <View style={styles.dropdownHeader}>
-              <AppText style={styles.dropdownTitle}>
+            ) : (
+              <AppText style={styles.placeholder}>
                 Selecciona la prioridad
               </AppText>
-            </View>
-            <View style={styles.optionsList}>
-              {priorityOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.optionItem,
-                    priority === option.value && styles.optionItemSelected,
-                  ]}
-                  onPress={() => {
-                    setPriority(option.value as Priority);
-                    setOpen(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <View
-                      style={[
-                        styles.badge,
-                        { backgroundColor: option.bgColor },
-                      ]}
-                    >
-                      <AppText
-                        style={[styles.badgeText, { color: option.color }]}
+            )}
+            <ChevronDown
+              size={20}
+              color="#94A3B8"
+              style={[styles.chevron, open && styles.chevronOpen]}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <AppText style={styles.label}>Tipo de Incidencia</AppText>
+          <TouchableOpacity
+            style={styles.selectButton}
+            onPress={() => setOpenArea(true)}
+            activeOpacity={0.7}
+          >
+            {areaId ? (
+              <View style={styles.selectedOption}>
+                <AppText style={styles.selectedText}>
+                  {(() => {
+                    const area = areas.find((a) => a.id === areaId);
+                    return area
+                      ? area.name.charAt(0).toUpperCase() + area.name.slice(1)
+                      : "";
+                  })()}
+                </AppText>
+              </View>
+            ) : (
+              <AppText style={styles.placeholder}>Selecciona el área</AppText>
+            )}
+            <ChevronDown
+              size={20}
+              color="#94A3B8"
+              style={[styles.chevron, openArea && styles.chevronOpen]}
+            />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <AppText style={styles.label}>Descripción</AppText>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={description}
+            onChangeText={setDescription}
+            returnKeyType="done"
+            blurOnSubmit={true}
+            onSubmitEditing={Keyboard.dismiss}
+            multiline
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, loading && { opacity: 0.6 }]}
+          onPress={handleSubmit}
+          disabled={loading}
+        >
+          <AppText style={styles.buttonText}>
+            {loading ? "Enviando..." : "Reportar Incidencia"}
+          </AppText>
+        </TouchableOpacity>
+
+        <Modal visible={open} transparent animationType="fade">
+          <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
+            <View style={styles.dropdown}>
+              <View style={styles.dropdownHeader}>
+                <AppText style={styles.dropdownTitle}>
+                  Selecciona la prioridad
+                </AppText>
+              </View>
+              <View style={styles.optionsList}>
+                {priorityOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.optionItem,
+                      priority === option.value && styles.optionItemSelected,
+                    ]}
+                    onPress={() => {
+                      setPriority(option.value as Priority);
+                      setOpen(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionContent}>
+                      <View
+                        style={[
+                          styles.badge,
+                          { backgroundColor: option.bgColor },
+                        ]}
                       >
-                        {option.label}
+                        <AppText
+                          style={[styles.badgeText, { color: option.color }]}
+                        >
+                          {option.label}
+                        </AppText>
+                      </View>
+                    </View>
+                    {priority === option.value && (
+                      <View style={styles.checkContainer}>
+                        <Check size={20} color="#0099ff" strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+
+        <Modal visible={openArea} transparent animationType="fade">
+          <Pressable style={styles.overlay} onPress={() => setOpenArea(false)}>
+            <View style={styles.dropdown}>
+              <View style={styles.dropdownHeader}>
+                <AppText style={styles.dropdownTitle}>
+                  Selecciona el área
+                </AppText>
+              </View>
+              <View style={styles.optionsList}>
+                {areas.map((area) => (
+                  <TouchableOpacity
+                    key={area.id}
+                    style={[
+                      styles.optionItem,
+                      areaId === area.id && styles.optionItemSelected,
+                    ]}
+                    onPress={() => {
+                      setAreaId(area.id);
+                      setOpenArea(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.optionContent}>
+                      <AppText style={styles.areaText}>
+                        {area.name.charAt(0).toUpperCase() + area.name.slice(1)}
                       </AppText>
                     </View>
-                  </View>
-                  {priority === option.value && (
-                    <View style={styles.checkContainer}>
-                      <Check size={20} color="#0099ff" strokeWidth={3} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+                    {areaId === area.id && (
+                      <View style={styles.checkContainer}>
+                        <Check size={20} color="#0099ff" strokeWidth={3} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={openArea} transparent animationType="fade">
-        <Pressable style={styles.overlay} onPress={() => setOpenArea(false)}>
-          <View style={styles.dropdown}>
-            <View style={styles.dropdownHeader}>
-              <AppText style={styles.dropdownTitle}>Selecciona el área</AppText>
-            </View>
-            <View style={styles.optionsList}>
-              {areas.map((area) => (
-                <TouchableOpacity
-                  key={area.id}
-                  style={[
-                    styles.optionItem,
-                    areaId === area.id && styles.optionItemSelected,
-                  ]}
-                  onPress={() => {
-                    setAreaId(area.id);
-                    setOpenArea(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <AppText style={styles.areaText}>
-                      {area.name.charAt(0).toUpperCase() + area.name.slice(1)}
-                    </AppText>
-                  </View>
-                  {areaId === area.id && (
-                    <View style={styles.checkContainer}>
-                      <Check size={20} color="#0099ff" strokeWidth={3} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
-    </View>
+          </Pressable>
+        </Modal>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
