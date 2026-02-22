@@ -29,7 +29,7 @@ export const useTheme = () => {
                 setThemeMode(savedTheme as ThemeMode);
             }
         } catch (error) {
-            console.error("Error loading theme:", error);
+
         } finally {
             setIsLoading(false);
         }
@@ -40,7 +40,6 @@ export const useTheme = () => {
             await SecureStore.setItemAsync(THEME_KEY, mode);
             setThemeMode(mode);
         } catch (error) {
-            console.error("Error saving theme:", error);
         }
     };
 
