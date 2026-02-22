@@ -5,11 +5,11 @@ import { supabase } from "@/src/services/supabase";
 import * as SecureStore from "expo-secure-store";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    StyleSheet,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  StyleSheet,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface StayInfoModalProps {
@@ -85,7 +85,6 @@ export const StayInfoModal = ({
         loading: false,
       });
     } catch (error: any) {
-      console.error("Error fetching stay info:", error);
       setStayInfo({
         incidentsCount: 0,
         checkIn: "---",

@@ -236,7 +236,6 @@ export default function UsersManagementScreen() {
                     <FlashList
                         data={filteredUsers}
                         renderItem={renderItem}
-                        estimatedItemSize={100}
                         contentContainerStyle={styles.listContent}
                         refreshControl={
                             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

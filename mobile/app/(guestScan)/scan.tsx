@@ -35,22 +35,13 @@ export default function GuestScanScreen() {
 
         setScanning(false)
 
-        let parsed
+        let accessCode
         try {
-            parsed = JSON.parse(data)
+            const parsed = JSON.parse(data)
+            accessCode = parsed.access_code
         } catch {
-            Alert.alert('Código inválido', 'El QR no es válido', [
-                {
-                    text: 'Intentar de nuevo',
-                    onPress: () => {
-                        scanLock.current = false
-                    },
-                },
-            ])
-            return
+            accessCode = data
         }
-
-        const accessCode = parsed.access_code
 
         if (!accessCode) {
             Alert.alert('Código inválido', 'El QR no contiene un código válido', [

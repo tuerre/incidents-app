@@ -108,7 +108,6 @@ export default function GuestSettingsScreen() {
             setRoomNumber("---");
           }
         } catch (error) {
-          console.error("Error fetching guest info:", error);
           setGuestName("Huésped");
           setGuestNameChartAt("H");
           setRoomNumber("---");
