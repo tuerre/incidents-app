@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { ModeToggle } from "./ui/mode-toggle"
 import { ThemeSelector } from "./theme-selector"
+import { MountedOnly } from "./mounted-only"
 
 const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -30,8 +31,10 @@ export function SiteHeader() {
         />
         <h1 className="text-base font-medium">{title}</h1>
         <div className="ml-auto flex items-center gap-2">
-          <ThemeSelector />
-          <ModeToggle />
+          <MountedOnly>
+            <ThemeSelector />
+            <ModeToggle />
+          </MountedOnly>
         </div>
       </div>
     </header>

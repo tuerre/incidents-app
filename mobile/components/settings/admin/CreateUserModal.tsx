@@ -103,7 +103,6 @@ export const CreateUserModal = ({
             });
             onClose();
         } catch (error: any) {
-            console.error("Error creating user:", error);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert(
                 "Error",

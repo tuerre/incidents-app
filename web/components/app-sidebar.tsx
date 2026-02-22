@@ -14,6 +14,7 @@ import {
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { MountedOnly } from "@/components/mounted-only"
 import {
   Sidebar,
   SidebarContent,
@@ -113,7 +114,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavMain items={navItems} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} />
+        <MountedOnly>
+          <NavUser user={user} />
+        </MountedOnly>
       </SidebarFooter>
     </Sidebar>
   )

@@ -3,16 +3,16 @@ import { supabase } from "@/src/services/supabase";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 interface EditUsernameModalProps {
@@ -75,7 +75,6 @@ export const EditUsernameModal = ({
         "Tu nombre de usuario ha sido actualizado correctamente.",
       );
     } catch (error: any) {
-      console.error("Error updating username:", error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(
         "Error",

@@ -27,8 +27,11 @@ import {
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
+  type FilterFn,
 } from "@tanstack/react-table"
 import { z } from "zod"
+
+import { Input } from "@/components/ui/input"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -284,41 +287,118 @@ export function DataTable({
 
   return (
     <div className="w-full flex-col justify-start gap-6 px-4 lg:px-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold">Incidencias Recientes</h2>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Columnas</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter(
-                  (column) =>
-                    typeof column.accessorFn !== "undefined" &&
-                    column.getCanHide()
-                )
-                .map((column) => {
-                  return (
-                    <DropdownMenuCheckboxItem
-                      key={column.id}
-                      className="capitalize"
-                      checked={column.getIsVisible()}
-                      onCheckedChange={(value) =>
-                        column.toggleVisibility(!!value)
-                      }
-                    >
-                      {column.id}
-                    </DropdownMenuCheckboxItem>
+      <div className="flex flex-col gap-4 mb-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Incidencias Recientes</h2>
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8">
+                  <IconLayoutColumns className="size-4 mr-2" />
+                  <span className="hidden lg:inline">Columnas</span>
+                  <IconChevronDown className="size-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {table
+                  .getAllColumns()
+                  .filter(
+                    (column) =>
+                      typeof column.accessorFn !== "undefined" &&
+                      column.getCanHide()
                   )
-                })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                  .map((column) => {
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.id}
+                        className="capitalize"
+                        checked={column.getIsVisible()}
+                        onCheckedChange={(value) =>
+                          column.toggleVisibility(!!value)
+                        }
+                      >
+                        {column.id}
+                      </DropdownMenuCheckboxItem>
+                    )
+                  })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            placeholder="Filtrar por título..."
+            value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("title")?.setFilterValue(event.target.value)
+            }
+            className="h-8 w-[150px] lg:w-[250px]"
+          />
+          <Input
+            placeholder="Habitación..."
+            value={(table.getColumn("room")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("room")?.setFilterValue(event.target.value)
+            }
+            className="h-8 w-[100px] lg:w-[150px]"
+          />
+          <Input
+            placeholder="Empleado..."
+            value={(table.getColumn("assigned_to")?.getFilterValue() as string) ?? ""}
+            onChange={(event) =>
+              table.getColumn("assigned_to")?.setFilterValue(event.target.value)
+            }
+            className="h-8 w-[120px] lg:w-[180px]"
+          />
+
+          <Select
+            value={(table.getColumn("status")?.getFilterValue() as string) ?? "all"}
+            onValueChange={(value) =>
+              table.getColumn("status")?.setFilterValue(value === "all" ? "" : value)
+            }
+          >
+            <SelectTrigger className="h-8 w-auto max-w-[200px">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {Object.entries(statusConfig).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  {config.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={(table.getColumn("priority")?.getFilterValue() as string) ?? "all"}
+            onValueChange={(value) =>
+              table.getColumn("priority")?.setFilterValue(value === "all" ? "" : value)
+            }
+          >
+            <SelectTrigger className="h-8 w-auto max-w-[200px]">
+              <SelectValue placeholder="Prioridad" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las prioridades</SelectItem>
+              {Object.entries(priorityConfig).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  {config.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {table.getState().columnFilters.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={() => table.resetColumnFilters()}
+              className="h-8 px-2 lg:px-3"
+            >
+              Limpiar
+            </Button>
+          )}
         </div>
       </div>
       <div className="overflow-hidden rounded-lg border">

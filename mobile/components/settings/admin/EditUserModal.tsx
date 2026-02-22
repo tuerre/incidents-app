@@ -95,7 +95,6 @@ export const EditUserModal = ({
             });
             onClose();
         } catch (error: any) {
-            console.error("Error updating user:", error);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert("Error", "No se pudo actualizar el usuario. Intenta de nuevo.");
         } finally {

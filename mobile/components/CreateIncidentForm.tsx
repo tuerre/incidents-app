@@ -1,12 +1,8 @@
-import { AppText } from "@/components/AppText";
-import { supabase } from "@/src/services/supabase";
-import * as SecureStore from "expo-secure-store";
-import { Check, ChevronDown } from "lucide-react-native";
-import React, { useEffect, useState } from "react";
+import { ModalSheet } from "@/components/settings/ModalSheet";
 import {
   Alert,
+  Animated,
   Keyboard,
-  Modal,
   Pressable,
   StyleSheet,
   TextInput,
@@ -14,6 +10,11 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { AppText } from "@/components/AppText";
+import { supabase } from "@/src/services/supabase";
+import * as SecureStore from "expo-secure-store";
+import { Check, ChevronDown } from "lucide-react-native";
+import React, { useEffect, useRef, useState } from "react";
 
 type Priority = "baja" | "media" | "alta";
 
@@ -24,7 +25,7 @@ const priorityOptions = [
 ];
 
 type Area = {
-  id: number;
+  id: string;
   name: string;
 };
 
@@ -32,11 +33,49 @@ export const CreateIncidentForm = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<Priority | null>(null);
-  const [areaId, setAreaId] = useState<number | null>(null);
+  const [areaId, setAreaId] = useState<string | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [openArea, setOpenArea] = useState(false);
+
+  // Animaciones para ModalSheet
+  const prioritySlide = useRef(new Animated.Value(600)).current;
+  const areaSlide = useRef(new Animated.Value(600)).current;
+
+  useEffect(() => {
+    if (open) {
+      Animated.spring(prioritySlide, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+    } else {
+      Animated.timing(prioritySlide, {
+        toValue: 600,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (openArea) {
+      Animated.spring(areaSlide, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 10,
+      }).start();
+    } else {
+      Animated.timing(areaSlide, {
+        toValue: 600,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [openArea]);
 
   useEffect(() => {
     loadAreas();
@@ -204,92 +243,110 @@ export const CreateIncidentForm = () => {
           </AppText>
         </TouchableOpacity>
 
-        <Modal visible={open} transparent animationType="fade">
-          <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-            <View style={styles.dropdown}>
-              <View style={styles.dropdownHeader}>
-                <AppText style={styles.dropdownTitle}>
-                  Selecciona la prioridad
-                </AppText>
-              </View>
-              <View style={styles.optionsList}>
-                {priorityOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.optionItem,
-                      priority === option.value && styles.optionItemSelected,
-                    ]}
-                    onPress={() => {
-                      setPriority(option.value as Priority);
-                      setOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.optionContent}>
-                      <View
-                        style={[
-                          styles.badge,
-                          { backgroundColor: option.bgColor },
-                        ]}
-                      >
-                        <AppText
-                          style={[styles.badgeText, { color: option.color }]}
-                        >
-                          {option.label}
-                        </AppText>
-                      </View>
-                    </View>
-                    {priority === option.value && (
-                      <View style={styles.checkContainer}>
-                        <Check size={20} color="#0099ff" strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+        <ModalSheet
+          visible={open}
+          onClose={() => setOpen(false)}
+          slideAnim={prioritySlide}
+          height="auto"
+        >
+          <View style={styles.dropdownContent}>
+            <View style={styles.dropdownHeader}>
+              <AppText style={styles.dropdownTitle}>
+                Selecciona la prioridad
+              </AppText>
             </View>
-          </Pressable>
-        </Modal>
-
-        <Modal visible={openArea} transparent animationType="fade">
-          <Pressable style={styles.overlay} onPress={() => setOpenArea(false)}>
-            <View style={styles.dropdown}>
-              <View style={styles.dropdownHeader}>
-                <AppText style={styles.dropdownTitle}>
-                  Selecciona el área
-                </AppText>
-              </View>
-              <View style={styles.optionsList}>
-                {areas.map((area) => (
-                  <TouchableOpacity
-                    key={area.id}
-                    style={[
-                      styles.optionItem,
-                      areaId === area.id && styles.optionItemSelected,
-                    ]}
-                    onPress={() => {
-                      setAreaId(area.id);
-                      setOpenArea(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.optionContent}>
-                      <AppText style={styles.areaText}>
-                        {area.name.charAt(0).toUpperCase() + area.name.slice(1)}
+            <View style={styles.optionsList}>
+              {priorityOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.optionItem,
+                    priority === option.value && styles.optionItemSelected,
+                  ]}
+                  onPress={() => {
+                    setPriority(option.value as Priority);
+                    setOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionContent}>
+                    <View
+                      style={[
+                        styles.badge,
+                        { backgroundColor: option.bgColor },
+                      ]}
+                    >
+                      <AppText
+                        style={[styles.badgeText, { color: option.color }]}
+                      >
+                        {option.label}
                       </AppText>
                     </View>
-                    {areaId === area.id && (
-                      <View style={styles.checkContainer}>
-                        <Check size={20} color="#0099ff" strokeWidth={3} />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
+                  </View>
+                  {priority === option.value && (
+                    <View style={styles.checkContainer}>
+                      <Check size={20} color="#0099ff" strokeWidth={3} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
-          </Pressable>
-        </Modal>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setOpen(false)}
+            >
+              <AppText style={styles.closeModalText}>Cerrar</AppText>
+            </TouchableOpacity>
+          </View>
+        </ModalSheet>
+
+        <ModalSheet
+          visible={openArea}
+          onClose={() => setOpenArea(false)}
+          slideAnim={areaSlide}
+          height="60%"
+        >
+          <View style={styles.dropdownContent}>
+            <View style={styles.dropdownHeader}>
+              <AppText style={styles.dropdownTitle}>
+                Selecciona el área
+              </AppText>
+            </View>
+            <View style={styles.optionsList}>
+              {areas.map((area) => (
+                <TouchableOpacity
+                  key={area.id}
+                  style={[
+                    styles.optionItem,
+                    areaId === area.id && styles.optionItemSelected,
+                  ]}
+                  onPress={() => {
+                    setAreaId(area.id);
+                    setOpenArea(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.optionContent}>
+                    <AppText style={styles.areaText}>
+                      {area.name.charAt(0).toUpperCase() + area.name.slice(1)}
+                    </AppText>
+                  </View>
+                  {areaId === area.id && (
+                    <View style={styles.checkContainer}>
+                      <Check size={20} color="#0099ff" strokeWidth={3} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setOpenArea(false)}
+            >
+              <AppText style={styles.closeModalText}>Cerrar</AppText>
+            </TouchableOpacity>
+          </View>
+        </ModalSheet>
       </View>
     </TouchableWithoutFeedback>
   );
@@ -371,49 +428,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "PoppinsBold",
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  dropdown: {
-    backgroundColor: "#FFF",
-    borderRadius: 16,
-    width: "100%",
-    maxWidth: 400,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
+  dropdownContent: {
+    padding: 24,
+    paddingTop: 32,
   },
   dropdownHeader: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
+    marginBottom: 20,
+    alignItems: "center",
   },
   dropdownTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontFamily: "PoppinsBold",
     color: "#1E293B",
+    marginBottom: 4,
   },
   optionsList: {
-    padding: 8,
+    gap: 10,
   },
   optionItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginVertical: 2,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(0, 0, 0, 0.05)",
   },
   optionItemSelected: {
-    backgroundColor: "#F0F9FF",
+    backgroundColor: "rgba(0, 153, 255, 0.1)",
+    borderColor: "#0099ff",
   },
   optionContent: {
     flex: 1,
@@ -421,13 +466,23 @@ const styles = StyleSheet.create({
   checkContainer: {
     marginLeft: 12,
   },
-  selectedText: {
-    textTransform: "capitalize",
-    fontSize: 15,
+  areaText: {
+    fontSize: 16,
     color: "#1E293B",
     fontFamily: "PoppinsMedium",
   },
-  areaText: {
+  closeModalButton: {
+    marginTop: 20,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  closeModalText: {
+    color: "#64748B",
+    fontSize: 15,
+    fontFamily: "PoppinsMedium",
+  },
+  selectedText: {
+    textTransform: "capitalize",
     fontSize: 15,
     color: "#1E293B",
     fontFamily: "PoppinsMedium",
