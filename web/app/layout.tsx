@@ -4,6 +4,8 @@ import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { ThemeProvider } from "@/components/providers/theme-providers"
 import { ActiveThemeProvider } from "@/components/active-theme";
+import { Toaster } from "sileo"
+import "sileo/styles.css"
 import { cookies } from "next/headers";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +48,7 @@ export default async function RootLayout({
             <ActiveThemeProvider initialTheme={activeThemeValue}>
               {children}
             </ActiveThemeProvider>
+            <Toaster />
           </ThemeProvider>
         </TooltipProvider>
       </body>

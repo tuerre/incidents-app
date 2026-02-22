@@ -23,8 +23,6 @@ export default function LoginPage() {
           .eq("id", user.id)
           .single();
 
-        console.log(profile)
-
         if (profile?.role === "admin") {
           router.push("/dashboard");
           router.refresh();
