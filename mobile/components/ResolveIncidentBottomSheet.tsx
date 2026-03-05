@@ -145,14 +145,17 @@ export const ResolveIncidentBottomSheet = ({
   };
 
   const uploadImage = async (uri: string) => {
+    console.log("[UPLOAD] Iniciando upload de imagen:", uri);
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw new Error("No auth");
 
     const ext = uri.split(".").pop() ?? "jpg";
     const filePath = `${data.user.id}/${Date.now()}.${ext}`;
+    console.log("[UPLOAD] Path destino en bucket:", filePath);
 
     const res = await fetch(uri);
     const arrayBuffer = await res.arrayBuffer();
+    console.log("[UPLOAD] ArrayBuffer size:", arrayBuffer.byteLength);
 
     const { error } = await supabase.storage
       .from("incident-evidence")
@@ -161,8 +164,12 @@ export const ResolveIncidentBottomSheet = ({
         upsert: false,
       });
 
-    if (error) throw error;
+    if (error) {
+      console.error("[UPLOAD] Error subiendo al bucket:", error.message);
+      throw error;
+    }
 
+    console.log("[UPLOAD] Imagen subida exitosamente al bucket:", filePath);
     return filePath;
   };
 
@@ -174,40 +181,74 @@ export const ResolveIncidentBottomSheet = ({
 
     try {
       setUploading(true);
+      console.log("[SUBMIT] Iniciando resolución de incidencia:", incidentId);
 
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) throw new Error("No auth");
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) throw new Error("No auth");
+      console.log("[SUBMIT] Usuario autenticado:", authData.user.id);
 
-      const { data: resolution } = await supabase
+      // 1. Insertar resolución
+      console.log("[SUBMIT] Insertando en incident_resolutions...");
+      const { data: resolution, error: resolutionError } = await supabase
         .from("incident_resolutions")
         .insert({
           incident_id: incidentId,
-          resolved_by: data.user.id,
+          resolved_by: authData.user.id,
           description: description.trim(),
         })
         .select()
         .single();
 
+      if (resolutionError) {
+        console.error("[SUBMIT] Error al insertar incident_resolutions:", resolutionError.message, resolutionError.code);
+        throw resolutionError;
+      }
+      console.log("[SUBMIT] Resolución insertada:", JSON.stringify(resolution));
+
+      // 2. Subir imágenes y registrar evidencia
       if (images.length) {
+        console.log("[SUBMIT] Subiendo", images.length, "imagen(es)...");
         const paths = await Promise.all(images.map(uploadImage));
-        await supabase.from("incident_evidence").insert(
-          paths.map((p) => ({
-            incident_id: incidentId,
-            image_url: p,
-          })),
-        );
+        console.log("[SUBMIT] Paths subidos:", paths);
+
+        console.log("[SUBMIT] Insertando en incident_evidence...");
+        const { error: evidenceError } = await supabase
+          .from("incident_evidence")
+          .insert(
+            paths.map((p) => ({
+              incident_id: incidentId,
+              image_url: p,
+            })),
+          );
+
+        if (evidenceError) {
+          console.error("[SUBMIT] Error al insertar incident_evidence:", evidenceError.message, evidenceError.code);
+          throw evidenceError;
+        }
+        console.log("[SUBMIT] Evidencia insertada correctamente");
+      } else {
+        console.log("[SUBMIT] No hay imágenes para subir");
       }
 
-      await supabase
+      // 3. Actualizar status de la incidencia
+      console.log("[SUBMIT] Actualizando status a 'resuelta'...");
+      const { error: statusError } = await supabase
         .from("incidents")
         .update({ status: "resuelta" })
         .eq("id", incidentId);
+
+      if (statusError) {
+        console.error("[SUBMIT] Error al actualizar status:", statusError.message, statusError.code);
+        throw statusError;
+      }
+      console.log("[SUBMIT] ¡Incidencia resuelta correctamente!");
 
       // Reset form only on successful submit
       resetForm();
       handleClose();
       onSuccess();
     } catch (e: any) {
+      console.error("[SUBMIT] Error general:", e.message);
       setGeneralError(e.message);
     } finally {
       setUploading(false);

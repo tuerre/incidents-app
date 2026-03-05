@@ -65,11 +65,18 @@ export default function IncidentDetailScreen() {
   const [imagesPreloaded, setImagesPreloaded] = useState(false);
   const year = new Date().getFullYear();
 
-  const getPublicImageUrl = (path: string) => {
-    const { data } = supabase.storage
-      .from("incident-evidence")
-      .getPublicUrl(path);
-    return data.publicUrl;
+  const getSignedImageUrl = async (path: string) => {
+    console.log("[IMG] Solicitando signed URL para path:", path);
+    const { data, error } = await supabase.storage
+      .from("incident-evidence") // nombre correcto del bucket con guión
+      .createSignedUrl(path, 60 * 60);
+
+    if (error) {
+      console.error("[IMG] Error al crear signed URL:", error.message, "| path:", path);
+      return null;
+    }
+    console.log("[IMG] Signed URL obtenida correctamente:", data.signedUrl);
+    return data.signedUrl;
   };
 
   useEffect(() => {
@@ -79,6 +86,7 @@ export default function IncidentDetailScreen() {
   const loadIncident = async () => {
     try {
       setLoading(true);
+      console.log("[INCIDENT] Cargando incidencia id:", id);
 
       const { data, error } = await supabase
         .from("incidents")
@@ -94,121 +102,50 @@ export default function IncidentDetailScreen() {
         .eq("id", id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[INCIDENT] Error en query:", error.message);
+        throw error;
+      }
+
+      console.log("[INCIDENT] Status:", data.status);
+      console.log("[INCIDENT] incident_resolutions:", JSON.stringify(data.incident_resolutions));
+      console.log("[INCIDENT] incident_evidence:", JSON.stringify(data.incident_evidence));
 
       // Mostrar datos de inmediato
       setIncident(data);
       setLoading(false);
 
-      // Cargar imágenes en segundo plano
+      // Cargar imágenes en segundo plano con URLs firmadas
       if (data.incident_evidence?.length) {
-        const imageUrls = data.incident_evidence.reduce((acc: Record<string, string>, e: any) => {
-          const publicUrl = getPublicImageUrl(e.image_url);
-          if (publicUrl) {
-            acc[e.image_url] = publicUrl;
+        console.log("[IMG] Encontradas", data.incident_evidence.length, "imágenes de evidencia");
+        const signedUrlEntries = await Promise.all(
+          data.incident_evidence.map(async (e: any) => {
+            console.log("[IMG] Procesando evidencia con image_url:", e.image_url);
+            const url = await getSignedImageUrl(e.image_url);
+            return [e.image_url, url] as [string, string | null];
+          }),
+        );
+        const imageUrls: Record<string, string> = {};
+        for (const [path, url] of signedUrlEntries) {
+          if (url) {
+            imageUrls[path] = url;
+            console.log("[IMG] URL lista para path:", path);
+          } else {
+            console.warn("[IMG] URL nula para path:", path, "- posiblemente sin permiso de lectura en Storage");
           }
-          return acc;
-        }, {});
+        }
+        console.log("[IMG] Total URLs resueltas:", Object.keys(imageUrls).length);
         setSignedImages(imageUrls);
+        setImagesPreloaded(true);
+      } else {
+        console.log("[IMG] No hay evidencia de imágenes para esta incidencia");
         setImagesPreloaded(true);
       }
     } catch (e: any) {
+      console.error("[INCIDENT] Error general:", e.message);
       Alert.alert("Error", e.message ?? "Error cargando incidencia");
       router.back();
     }
-  };
-
-  const handleAcceptTask = async () => {
-    try {
-      setActionLoading(true);
-
-      const { data: currentIncident, error: fetchError } = await supabase
-        .from("incidents")
-        .select("status")
-        .eq("id", id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      if (currentIncident.status !== "pendiente") {
-        Alert.alert(
-          "Tarea no disponible",
-          "Esta tarea ya fue aceptada por otro empleado del área.",
-          [
-            {
-              text: "OK",
-              onPress: () => router.back(),
-            },
-          ],
-        );
-        return;
-      }
-
-      const { error: updateError } = await supabase
-        .from("incidents")
-        .update({
-          status: "recibida",
-          assigned_to: currentUserId,
-        })
-        .eq("id", id);
-
-      if (updateError) throw updateError;
-
-      Alert.alert("Éxito", "Has aceptado la tarea correctamente", [
-        {
-          text: "OK",
-          onPress: () => loadIncident(),
-        },
-      ]);
-    } catch (e: any) {
-      Alert.alert("Error", e.message ?? "Error al aceptar tarea");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleRejectTask = () => {
-    Alert.alert(
-      "Rechazar tarea",
-      "¿Estás seguro de que deseas rechazar esta tarea? La incidencia quedará libre para otro empleado del área.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Rechazar",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-
-              const { error } = await supabase
-                .from("incidents")
-                .update({
-                  status: "pendiente",
-                  assigned_to: null,
-                })
-                .eq("id", id);
-
-              if (error) throw error;
-
-              Alert.alert("Tarea rechazada", "La incidencia ha sido liberada", [
-                {
-                  text: "OK",
-                  onPress: () => router.back(),
-                },
-              ]);
-            } catch (e: any) {
-              Alert.alert("Error", e.message ?? "Error al rechazar tarea");
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleResolveTask = () => {
-    setShowResolveModal(true);
   };
 
   const handleResolveSuccess = () => {
@@ -300,7 +237,7 @@ export default function IncidentDetailScreen() {
                       incident.status === "pendiente"
                         ? "#FEF3C7"
                         : incident.status === "recibida"
-                          ? "#DBEAFE"
+                          ? "#FEF3C7"
                           : incident.status === "en_progreso"
                             ? "#E0E7FF"
                             : "#ECFDF5",
@@ -315,7 +252,7 @@ export default function IncidentDetailScreen() {
                         incident.status === "pendiente"
                           ? "#F59E0B"
                           : incident.status === "recibida"
-                            ? "#2563EB"
+                            ? "#F59E0B"
                             : incident.status === "en_progreso"
                               ? "#6366F1"
                               : "#10B981",
@@ -471,64 +408,6 @@ export default function IncidentDetailScreen() {
             )}
         </View>
       </ScrollView>
-
-      {/* Botón de Acción */}
-      <View style={styles.footer}>
-        {isPending && !isAssignedToMe && (
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              actionLoading && styles.disabledButton,
-            ]}
-            onPress={handleAcceptTask}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-              <ActivityIndicator color="#FFF" />
-            ) : (
-              <AppText style={styles.actionButtonText}>
-                Aceptar la tarea
-              </AppText>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {isAssignedToMe && incident.status !== "resuelta" && (
-          <View style={styles.assignedButtonsContainer}>
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.resolveButton,
-                actionLoading && styles.disabledButton,
-              ]}
-              onPress={handleResolveTask}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <View style={styles.buttonContent}>
-                  <Wrench size={20} color="#FFF" strokeWidth={2.5} />
-                  <AppText style={styles.actionButtonText}>
-                    Resolver Incidencia
-                  </AppText>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.trashButton,
-                actionLoading && styles.disabledButton,
-              ]}
-              onPress={handleRejectTask}
-              disabled={actionLoading}
-            >
-              <Trash2 size={22} color="#FFF" strokeWidth={2.5} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
 
       <ResolveIncidentBottomSheet
         visible={showResolveModal}
