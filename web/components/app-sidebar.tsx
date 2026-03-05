@@ -10,6 +10,7 @@ import {
   IconMapPin,
   IconKey,
   IconMushroomFilled,
+  IconBrandGithubCopilot
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -61,6 +62,11 @@ const navItems = [
     title: "Analíticas",
     url: "/dashboard/analytics",
     icon: IconChartBar,
+  },
+  {
+    title: "Asistente IA",
+    url: "/chatbot",
+    icon: IconBrandGithubCopilot,
   },
 ]
 
