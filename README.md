@@ -1,3 +1,5 @@
+me da pereza hacer el readme, pero este es un graaaaan proyecto, probablemente algo que se termine a futuro y quien sabe que más, por ahora, la documentacion por default. Made with ❤️ by Jendry <3
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
