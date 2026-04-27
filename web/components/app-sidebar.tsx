@@ -9,6 +9,7 @@ import {
   IconUsers,
   IconMapPin,
   IconKey,
+  IconBolt,
   IconMushroomFilled,
   IconBrandGithubCopilot
 } from "@tabler/icons-react"
@@ -42,6 +43,11 @@ const navItems = [
     title: "Áreas",
     url: "/dashboard/areas",
     icon: IconMapPin,
+  },
+  {
+    title: "Palabras clave",
+    url: "/dashboard/priority-keywords",
+    icon: IconBolt,
   },
   {
     title: "Empleados",

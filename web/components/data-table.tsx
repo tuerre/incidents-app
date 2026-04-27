@@ -30,8 +30,20 @@ import {
   type FilterFn,
 } from "@tanstack/react-table"
 import { z } from "zod"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { DateRange } from "react-day-picker"
+import { Calendar as CalendarIcon } from "lucide-react"
+
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 
 import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -104,7 +116,34 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
   urgente: { label: "Urgente", color: "text-red-600 dark:text-red-400" },
 }
 
-const columns: ColumnDef<z.infer<typeof schema>>[] = [
+const dateRangeFilterFn: FilterFn<any> = (row, columnId, value) => {
+  const dateStr = row.getValue(columnId) as string
+  if (!dateStr) return false
+  const date = new Date(dateStr)
+  const { from, to } = value as { from: Date | undefined; to: Date | undefined }
+
+  if (!from && !to) return true
+
+  // Normalize dates to start of day for comparison
+  const rowDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const startDate = from ? new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime() : null
+  const endDate = to ? new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime() : null
+
+  if (startDate && rowDate < startDate) return false
+  if (endDate && rowDate > endDate) return false
+
+  return true
+}
+
+type IncidentRow = z.infer<typeof schema>
+
+const buildColumns = ({
+  onEdit,
+  onDelete,
+}: {
+  onEdit?: (row: IncidentRow) => void
+  onDelete?: (row: IncidentRow) => void
+}): ColumnDef<IncidentRow>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -216,10 +255,11 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         </div>
       )
     },
+    filterFn: dateRangeFilterFn,
   },
   {
     id: "actions",
-    cell: () => (
+    cell: ({ row }) => (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
@@ -233,9 +273,16 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
           <DropdownMenuItem>Ver detalle</DropdownMenuItem>
-          <DropdownMenuItem>Editar</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onEdit?.(row.original)}>
+            Editar
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Eliminar</DropdownMenuItem>
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => onDelete?.(row.original)}
+          >
+            Eliminar
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
@@ -244,10 +291,15 @@ const columns: ColumnDef<z.infer<typeof schema>>[] = [
 
 export function DataTable({
   data: initialData,
+  onEdit,
+  onDelete,
 }: {
-  data: z.infer<typeof schema>[]
+  data: IncidentRow[]
+  onEdit?: (row: IncidentRow) => void
+  onDelete?: (row: IncidentRow) => void
 }) {
-  const [data] = React.useState(() => initialData)
+  const columns = React.useMemo(() => buildColumns({ onEdit, onDelete }), [onEdit, onDelete])
+  const data = React.useMemo(() => initialData, [initialData])
   const [rowSelection, setRowSelection] = React.useState({})
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({})
@@ -284,6 +336,8 @@ export function DataTable({
     getFacetedRowModel: getFacetedRowModel(),
     getFacetedUniqueValues: getFacetedUniqueValues(),
   })
+
+  const dateFilter = (table.getColumn("created_at")?.getFilterValue() as DateRange) ?? undefined
 
   return (
     <div className="w-full flex-col justify-start gap-6 px-4 lg:px-6">
@@ -389,6 +443,44 @@ export function DataTable({
               ))}
             </SelectContent>
           </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                size="sm"
+                className={cn(
+                  "h-8 w-[240px] justify-start text-left font-normal",
+                  !dateFilter && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateFilter?.from ? (
+                  dateFilter.to ? (
+                    <>
+                      {format(dateFilter.from, "LLL dd, y", { locale: es })} -{" "}
+                      {format(dateFilter.to, "LLL dd, y", { locale: es })}
+                    </>
+                  ) : (
+                    format(dateFilter.from, "LLL dd, y", { locale: es })
+                  )
+                ) : (
+                  <span>Filtrar por fecha</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateFilter?.from}
+                selected={dateFilter}
+                onSelect={(date) => table.getColumn("created_at")?.setFilterValue(date)}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
 
           {table.getState().columnFilters.length > 0 && (
             <Button

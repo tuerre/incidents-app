@@ -154,6 +154,7 @@ export const EmpleadoMyTasks = () => {
   const loadIncidents = async () => {
     try {
       setLoading(true);
+      const runId = `mytasks-load-${Date.now()}`;
 
       // Obtener usuario autenticado
       const {
@@ -165,10 +166,13 @@ export const EmpleadoMyTasks = () => {
       const { data, error } = await supabase
         .from("incidents")
         .select(
-          "id, title, description, priority, status, created_at, areas(name)",
+          "id, title, description, priority, status, assigned_to, created_at, areas(name)",
         )
         .eq("assigned_to", user.id)
         .order("created_at", { ascending: false });
+      // #region agent log
+      fetch('http://127.0.0.1:7691/ingest/06b09fcc-a127-44b1-b180-d825926153c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'af572f'},body:JSON.stringify({sessionId:'af572f',runId,hypothesisId:'H4',location:'mobile/components/EmpleadoMyTasks.tsx:loadIncidents',message:'Mis tareas query result snapshot',data:{userId:user.id,count:data?.length||0,hasError:Boolean(error),errorMessage:error?.message||null,sample:(data||[]).slice(0,3).map((i:any)=>({id:i.id,status:i.status,assigned_to:i.assigned_to??null,priority:i.priority}))},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       if (error) throw error;
 

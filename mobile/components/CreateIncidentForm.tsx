@@ -16,14 +16,6 @@ import * as SecureStore from "expo-secure-store";
 import { Check, ChevronDown } from "lucide-react-native";
 import React, { useEffect, useRef, useState } from "react";
 
-type Priority = "baja" | "media" | "alta";
-
-const priorityOptions = [
-  { value: "baja", label: "Baja", color: "#10B981", bgColor: "#ECFDF5" },
-  { value: "media", label: "Media", color: "#F59E0B", bgColor: "#FEF3C7" },
-  { value: "alta", label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" },
-];
-
 type Area = {
   id: string;
   name: string;
@@ -32,33 +24,14 @@ type Area = {
 export const CreateIncidentForm = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<Priority | null>(null);
+  const [userMarkedUrgent, setUserMarkedUrgent] = useState(false);
   const [areaId, setAreaId] = useState<string | null>(null);
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
   const [openArea, setOpenArea] = useState(false);
 
-  // Animaciones para ModalSheet
-  const prioritySlide = useRef(new Animated.Value(600)).current;
+  // Animacion para selector de area
   const areaSlide = useRef(new Animated.Value(600)).current;
-
-  useEffect(() => {
-    if (open) {
-      Animated.spring(prioritySlide, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 50,
-        friction: 10,
-      }).start();
-    } else {
-      Animated.timing(prioritySlide, {
-        toValue: 600,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [open]);
 
   useEffect(() => {
     if (openArea) {
@@ -96,7 +69,7 @@ export const CreateIncidentForm = () => {
   };
 
   const handleSubmit = async () => {
-    if (!title.trim() || !description.trim() || !priority || !areaId) {
+    if (!title.trim() || !description.trim() || !areaId) {
       Alert.alert("Error", "Completa todos los campos");
       return;
     }
@@ -112,7 +85,7 @@ export const CreateIncidentForm = () => {
       const { error } = await supabase.from("incidents").insert({
         title,
         description,
-        priority,
+        user_marked_urgent: userMarkedUrgent,
         area_id: areaId,
         room_id: guestSession.room_id,
       });
@@ -123,7 +96,7 @@ export const CreateIncidentForm = () => {
 
       setTitle("");
       setDescription("");
-      setPriority(null);
+      setUserMarkedUrgent(false);
       setAreaId(null);
     } catch (e: any) {
       Alert.alert("Error", e.message ?? "Error creando incidencia");
@@ -147,48 +120,23 @@ export const CreateIncidentForm = () => {
         </View>
 
         <View style={styles.inputGroup}>
-          <AppText style={styles.label}>Prioridad</AppText>
-          <TouchableOpacity
-            style={styles.selectButton}
-            onPress={() => setOpen(true)}
-            activeOpacity={0.7}
+          <AppText style={styles.label}>Urgencia</AppText>
+          <Pressable
+            style={styles.urgentToggle}
+            onPress={() => setUserMarkedUrgent((current) => !current)}
           >
-            {priority ? (
-              <View style={styles.selectedOption}>
-                <View
-                  style={[
-                    styles.badge,
-                    {
-                      backgroundColor: priorityOptions.find(
-                        (p) => p.value === priority,
-                      )?.bgColor,
-                    },
-                  ]}
-                >
-                  <AppText
-                    style={[
-                      styles.badgeText,
-                      {
-                        color: priorityOptions.find((p) => p.value === priority)
-                          ?.color,
-                      },
-                    ]}
-                  >
-                    {priorityOptions.find((p) => p.value === priority)?.label}
-                  </AppText>
-                </View>
-              </View>
-            ) : (
-              <AppText style={styles.placeholder}>
-                Selecciona la prioridad
-              </AppText>
-            )}
-            <ChevronDown
-              size={20}
-              color="#94A3B8"
-              style={[styles.chevron, open && styles.chevronOpen]}
-            />
-          </TouchableOpacity>
+            <View
+              style={[
+                styles.checkbox,
+                userMarkedUrgent && styles.checkboxChecked,
+              ]}
+            >
+              {userMarkedUrgent && <Check size={14} color="#FFFFFF" />}
+            </View>
+            <AppText style={styles.urgentLabel}>
+              ¿Considera esta incidencia urgente?
+            </AppText>
+          </Pressable>
         </View>
 
         <View style={styles.inputGroup}>
@@ -242,63 +190,6 @@ export const CreateIncidentForm = () => {
             {loading ? "Enviando..." : "Reportar Incidencia"}
           </AppText>
         </TouchableOpacity>
-
-        <ModalSheet
-          visible={open}
-          onClose={() => setOpen(false)}
-          slideAnim={prioritySlide}
-          height="auto"
-        >
-          <View style={styles.dropdownContent}>
-            <View style={styles.dropdownHeader}>
-              <AppText style={styles.dropdownTitle}>
-                Selecciona la prioridad
-              </AppText>
-            </View>
-            <View style={styles.optionsList}>
-              {priorityOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.optionItem,
-                    priority === option.value && styles.optionItemSelected,
-                  ]}
-                  onPress={() => {
-                    setPriority(option.value as Priority);
-                    setOpen(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.optionContent}>
-                    <View
-                      style={[
-                        styles.badge,
-                        { backgroundColor: option.bgColor },
-                      ]}
-                    >
-                      <AppText
-                        style={[styles.badgeText, { color: option.color }]}
-                      >
-                        {option.label}
-                      </AppText>
-                    </View>
-                  </View>
-                  {priority === option.value && (
-                    <View style={styles.checkContainer}>
-                      <Check size={20} color="#0099ff" strokeWidth={3} />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </View>
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={() => setOpen(false)}
-            >
-              <AppText style={styles.closeModalText}>Cerrar</AppText>
-            </TouchableOpacity>
-          </View>
-        </ModalSheet>
 
         <ModalSheet
           visible={openArea}
@@ -397,14 +288,36 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     fontSize: 15,
   },
-  badge: {
+  urgentToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 12,
+    backgroundColor: "#FFF",
   },
-  badgeText: {
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderWidth: 1.5,
+    borderColor: "#CBD5E1",
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FFF",
+  },
+  checkboxChecked: {
+    backgroundColor: "#EF4444",
+    borderColor: "#EF4444",
+  },
+  urgentLabel: {
     fontSize: 14,
-    fontFamily: "PoppinsSemiBold",
+    color: "#1E293B",
+    fontFamily: "PoppinsMedium",
+    flexShrink: 1,
   },
   chevron: {
     marginLeft: 8,

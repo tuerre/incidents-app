@@ -20,7 +20,7 @@ type Incident = {
   id: string;
   title: string;
   description: string;
-  priority: "baja" | "media" | "alta";
+  priority: "baja" | "media" | "alta" | "urgente";
   status: string;
   created_at: string;
   assigned_to: string | null;
@@ -44,6 +44,7 @@ const priorityConfig = {
   baja: { label: "Baja", color: "#10B981", bgColor: "#ECFDF5" },
   media: { label: "Media", color: "#F59E0B", bgColor: "#FEF3C7" },
   alta: { label: "Alta", color: "#EF4444", bgColor: "#FEE2E2" },
+  urgente: { label: "Urgente", color: "#DC2626", bgColor: "#FEE2E2" },
 };
 
 const statusConfig: Record<string, { label: string }> = {
@@ -288,6 +289,32 @@ export default function IncidentDetailScreen() {
     }
   };
 
+  const handlePriorityChange = async (
+    nextPriority: "baja" | "media" | "alta" | "urgente",
+  ) => {
+    if (!isAssignedToMe || incident?.status === "resuelta" || actionLoading) return;
+
+    try {
+      setActionLoading(true);
+      const { error } = await supabase
+        .from("incidents")
+        .update({
+          priority: nextPriority,
+          user_marked_urgent: nextPriority === "urgente",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+      await loadIncident();
+      Alert.alert("Éxito", "La urgencia fue actualizada");
+    } catch (e: any) {
+      Alert.alert("Error", e.message ?? "No se pudo actualizar la urgencia");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <ScreenPattern title="Detalle de Incidencia">
@@ -412,6 +439,33 @@ export default function IncidentDetailScreen() {
                     {priorityInfo.label}
                   </AppText>
                 </View>
+                {isAssignedToMe && incident.status !== "resuelta" && (
+                  <View style={styles.priorityActions}>
+                    {(["baja", "media", "alta", "urgente"] as const).map((value) => {
+                      const active = incident.priority === value;
+                      return (
+                        <TouchableOpacity
+                          key={value}
+                          style={[
+                            styles.priorityActionButton,
+                            active && styles.priorityActionButtonActive,
+                          ]}
+                          onPress={() => handlePriorityChange(value)}
+                          disabled={actionLoading}
+                        >
+                          <AppText
+                            style={[
+                              styles.priorityActionText,
+                              active && styles.priorityActionTextActive,
+                            ]}
+                          >
+                            {priorityConfig[value].label}
+                          </AppText>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
             </View>
 
@@ -666,6 +720,32 @@ const styles = StyleSheet.create({
   priorityText: {
     fontSize: 13,
     fontFamily: "PoppinsSemiBold",
+  },
+  priorityActions: {
+    marginTop: 10,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  priorityActionButton: {
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: "#FFF",
+  },
+  priorityActionButtonActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  priorityActionText: {
+    fontSize: 12,
+    color: "#4B5563",
+    fontFamily: "PoppinsMedium",
+  },
+  priorityActionTextActive: {
+    color: "#FFF",
   },
   footer: {
     position: "absolute",

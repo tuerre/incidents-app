@@ -33,6 +33,7 @@ import { sileo } from "sileo"
 interface Area {
     id: string
     name: string
+    base_priority?: string
     created_at?: string
 }
 
@@ -42,8 +43,8 @@ export default function AreasPage() {
     const [search, setSearch] = React.useState("")
     const [isSheetOpen, setIsSheetOpen] = React.useState(false)
     const [editingArea, setEditingArea] = React.useState<Area | null>(null)
-    const [formData, setFormData] = React.useState({ name: "" })
-    const [errors, setErrors] = React.useState<{ name?: string }>({})
+    const [formData, setFormData] = React.useState({ name: "", base_priority: "media" })
+    const [errors, setErrors] = React.useState<{ name?: string; base_priority?: string }>({})
     const [isSaving, setIsSaving] = React.useState(false)
 
     const fetchAreas = React.useCallback(async () => {
@@ -55,7 +56,18 @@ export default function AreasPage() {
                 .order("name")
 
             if (error) throw error
-            setAreas(data || [])
+            const areaIds = (data || []).map((area) => area.id)
+            const { data: rulesData, error: rulesError } = await supabase
+                .from("area_priority_rules")
+                .select("area_id, base_priority")
+                .in("area_id", areaIds.length ? areaIds : ["00000000-0000-0000-0000-000000000000"])
+
+            if (rulesError) throw rulesError
+            const rulesByArea = new Map((rulesData || []).map((rule: any) => [rule.area_id, rule.base_priority]))
+            setAreas((data || []).map((area) => ({
+                ...area,
+                base_priority: rulesByArea.get(area.id) || "media"
+            })))
         } catch (error: any) {
             sileo.error({
                 title: "Error al cargar áreas",
@@ -76,14 +88,14 @@ export default function AreasPage() {
 
     const handleOpenCreate = () => {
         setEditingArea(null)
-        setFormData({ name: "" })
+        setFormData({ name: "", base_priority: "media" })
         setErrors({})
         setIsSheetOpen(true)
     }
 
     const handleOpenEdit = (area: Area) => {
         setEditingArea(area)
-        setFormData({ name: area.name })
+        setFormData({ name: area.name, base_priority: area.base_priority || "media" })
         setErrors({})
         setIsSheetOpen(true)
     }
@@ -107,9 +119,12 @@ export default function AreasPage() {
     }
 
     const validateForm = () => {
-        const newErrors: { name?: string } = {}
+        const newErrors: { name?: string; base_priority?: string } = {}
         if (!formData.name.trim()) {
             newErrors.name = "El nombre del área es requerido"
+        }
+        if (!formData.base_priority) {
+            newErrors.base_priority = "La prioridad base es requerida"
         }
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
@@ -127,12 +142,28 @@ export default function AreasPage() {
                     .update({ name: formData.name })
                     .eq("id", editingArea.id)
                 if (error) throw error
+                const { error: rulesError } = await supabase
+                    .from("area_priority_rules")
+                    .upsert({
+                        area_id: editingArea.id,
+                        base_priority: formData.base_priority,
+                    }, { onConflict: "area_id" })
+                if (rulesError) throw rulesError
                 sileo.success({ title: "Área actualizada correctamente" })
             } else {
-                const { error } = await supabase
+                const { data: insertedArea, error } = await supabase
                     .from("areas")
                     .insert({ name: formData.name })
+                    .select("id")
+                    .single()
                 if (error) throw error
+                const { error: rulesError } = await supabase
+                    .from("area_priority_rules")
+                    .upsert({
+                        area_id: insertedArea.id,
+                        base_priority: formData.base_priority,
+                    }, { onConflict: "area_id" })
+                if (rulesError) throw rulesError
                 sileo.success({ title: "Área creada correctamente" })
             }
             setIsSheetOpen(false)
@@ -152,7 +183,7 @@ export default function AreasPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold">Áreas</h1>
-                    <p className="text-muted-foreground text-sm">Gestiona las áreas del hotel.</p>
+                    <p className="text-muted-foreground text-sm">Gestiona las áreas y su prioridad base automática.</p>
                 </div>
                 <Button onClick={handleOpenCreate}>
                     <IconPlus className="size-4 mr-2" />
@@ -177,19 +208,20 @@ export default function AreasPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nombre</TableHead>
+                            <TableHead>Prioridad Base</TableHead>
                             <TableHead className="w-[100px]">Acciones</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={2} className="text-center py-10">
+                                <TableCell colSpan={3} className="text-center py-10">
                                     Cargando...
                                 </TableCell>
                             </TableRow>
                         ) : filteredAreas.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={2} className="text-center py-10">
+                                <TableCell colSpan={3} className="text-center py-10">
                                     No se encontraron áreas.
                                 </TableCell>
                             </TableRow>
@@ -197,6 +229,7 @@ export default function AreasPage() {
                             filteredAreas.map((area) => (
                                 <TableRow key={area.id}>
                                     <TableCell className="font-medium capitalize">{area.name}</TableCell>
+                                    <TableCell className="capitalize">{area.base_priority || "media"}</TableCell>
                                     <TableCell>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -248,6 +281,23 @@ export default function AreasPage() {
                             />
                             {errors.name && (
                                 <p className="text-xs font-medium text-destructive">{errors.name}</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="base_priority">Prioridad base del área</Label>
+                            <select
+                                id="base_priority"
+                                value={formData.base_priority}
+                                onChange={(e) => setFormData({ ...formData, base_priority: e.target.value })}
+                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                                <option value="baja">Baja</option>
+                                <option value="media">Media</option>
+                                <option value="alta">Alta</option>
+                                <option value="urgente">Urgente</option>
+                            </select>
+                            {errors.base_priority && (
+                                <p className="text-xs font-medium text-destructive">{errors.base_priority}</p>
                             )}
                         </div>
                         <SheetFooter className="px-0">

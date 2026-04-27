@@ -23,6 +23,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { sileo } from "sileo"
 
 export default function IncidentsCRUDPage() {
@@ -40,12 +41,15 @@ export default function IncidentsCRUDPage() {
         description: "",
         status: "pendiente",
         priority: "media",
+        user_marked_urgent: false,
         area_id: "",
         room_id: "",
         assigned_to: "",
     })
     const [errors, setErrors] = React.useState<any>({})
     const [isSaving, setIsSaving] = React.useState(false)
+    const [isReassignSheetOpen, setIsReassignSheetOpen] = React.useState(false)
+    const [employeeSearch, setEmployeeSearch] = React.useState("")
 
     const fetchData = React.useCallback(async () => {
         try {
@@ -73,6 +77,7 @@ export default function IncidentsCRUDPage() {
             description,
             status,
             priority,
+            user_marked_urgent,
             created_at,
             area:areas(id, name),
             room:rooms(id, room_code),
@@ -89,6 +94,7 @@ export default function IncidentsCRUDPage() {
                 description: incident.description,
                 status: incident.status || "pendiente",
                 priority: incident.priority || "media",
+                user_marked_urgent: incident.user_marked_urgent || false,
                 area: incident.area?.name || "Sin área",
                 area_id: incident.area?.id,
                 room: incident.room?.room_code || "Sin habitación",
@@ -117,6 +123,7 @@ export default function IncidentsCRUDPage() {
             description: "",
             status: "pendiente",
             priority: "media",
+            user_marked_urgent: false,
             area_id: "",
             room_id: "",
             assigned_to: "",
@@ -131,7 +138,8 @@ export default function IncidentsCRUDPage() {
             title: incident.title,
             description: incident.description || "",
             status: incident.status,
-            priority: incident.priority,
+            priority: incident.priority || "media",
+            user_marked_urgent: Boolean(incident.user_marked_urgent),
             area_id: incident.area_id?.toString() || "",
             room_id: incident.room_id?.toString() || "",
             assigned_to: incident.assigned_to_id || "",
@@ -155,9 +163,9 @@ export default function IncidentsCRUDPage() {
 
     const validateForm = () => {
         const newErrors: any = {}
-        if (!formData.title.trim()) newErrors.title = "El título es requerido"
+        if (!editingIncident && !formData.title.trim()) newErrors.title = "El título es requerido"
         if (!formData.area_id) newErrors.area_id = "El área es requerida"
-        if (!formData.room_id) newErrors.room_id = "La habitación es requerida"
+        if (!editingIncident && !formData.room_id) newErrors.room_id = "La habitación es requerida"
 
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
@@ -168,6 +176,7 @@ export default function IncidentsCRUDPage() {
         if (!validateForm()) return
 
         try {
+            const runId = `incidents-save-${Date.now()}`
             const { data: { user } } = await supabase.auth.getUser()
 
             if (!user) {
@@ -180,17 +189,24 @@ export default function IncidentsCRUDPage() {
                 description: formData.description,
                 status: formData.status,
                 priority: formData.priority,
+                user_marked_urgent: formData.user_marked_urgent,
                 area_id: formData.area_id || null,
                 room_id: formData.room_id || null,
                 assigned_to: formData.assigned_to && formData.assigned_to !== 'none' ? formData.assigned_to : null,
                 created_by: user?.id
             }
+            // #region agent log
+            fetch('http://127.0.0.1:7691/ingest/06b09fcc-a127-44b1-b180-d825926153c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'af572f'},body:JSON.stringify({sessionId:'af572f',runId,hypothesisId:'H1',location:'web/app/(dashboard)/dashboard/incidents/page.tsx:payload',message:'Incidents save payload before mutation',data:{editing:Boolean(editingIncident),incidentId:editingIncident?.uuid||null,status:payload.status,assigned_to:payload.assigned_to,formAssignedTo:formData.assigned_to},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
 
             if (editingIncident) {
                 const { error } = await supabase
                     .from("incidents")
                     .update(payload)
                     .eq("id", editingIncident.uuid)
+                // #region agent log
+                fetch('http://127.0.0.1:7691/ingest/06b09fcc-a127-44b1-b180-d825926153c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'af572f'},body:JSON.stringify({sessionId:'af572f',runId,hypothesisId:'H1',location:'web/app/(dashboard)/dashboard/incidents/page.tsx:update',message:'Incidents update result',data:{incidentId:editingIncident.uuid,hasError:Boolean(error),errorMessage:error?.message||null},timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 if (error) throw error
                 sileo.success({ title: "Incidencia actualizada" })
             } else {
@@ -233,6 +249,8 @@ export default function IncidentsCRUDPage() {
                 ) : (
                     <DataTable
                         data={incidents}
+                        onEdit={handleOpenEdit}
+                        onDelete={(row) => handleDelete(row.uuid || "")}
                     />
                 )}
             </div>
@@ -246,28 +264,32 @@ export default function IncidentsCRUDPage() {
                         </SheetDescription>
                     </SheetHeader>
                     <form onSubmit={handleSave} className="space-y-4 px-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="title">Título</Label>
-                            <Input
-                                id="title"
-                                placeholder="Ej: Aire acondicionado no enfría"
-                                value={formData.title}
-                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                className={errors.title ? "border-destructive focus-visible:ring-destructive" : ""}
-                            />
-                            {errors.title && <p className="text-xs font-medium text-destructive">{errors.title}</p>}
-                        </div>
+                        {!editingIncident && (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="title">Título</Label>
+                                    <Input
+                                        id="title"
+                                        placeholder="Ej: Aire acondicionado no enfría"
+                                        value={formData.title}
+                                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                        className={errors.title ? "border-destructive focus-visible:ring-destructive" : ""}
+                                    />
+                                    {errors.title && <p className="text-xs font-medium text-destructive">{errors.title}</p>}
+                                </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="description">Descripción</Label>
-                            <Textarea
-                                id="description"
-                                placeholder="Detalles sobre el problema..."
-                                value={formData.description}
-                                onChange={(e: any) => setFormData({ ...formData, description: e.target.value })}
-                                rows={3}
-                            />
-                        </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="description">Descripción</Label>
+                                    <Textarea
+                                        id="description"
+                                        placeholder="Detalles sobre el problema..."
+                                        value={formData.description}
+                                        onChange={(e: any) => setFormData({ ...formData, description: e.target.value })}
+                                        rows={3}
+                                    />
+                                </div>
+                            </>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -291,7 +313,11 @@ export default function IncidentsCRUDPage() {
                                 <Label>Prioridad</Label>
                                 <Select
                                     value={formData.priority}
-                                    onValueChange={(value) => setFormData({ ...formData, priority: value })}
+                                    onValueChange={(value) => setFormData({
+                                        ...formData,
+                                        priority: value,
+                                        user_marked_urgent: value === "urgente"
+                                    })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Seleccionar" />
@@ -306,7 +332,7 @@ export default function IncidentsCRUDPage() {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className={`grid gap-4 ${editingIncident ? "grid-cols-1" : "grid-cols-2"}`}>
                             <div className="space-y-2">
                                 <Label>Área</Label>
                                 <Select
@@ -326,25 +352,27 @@ export default function IncidentsCRUDPage() {
                                 </Select>
                                 {errors.area_id && <p className="text-xs font-medium text-destructive">{errors.area_id}</p>}
                             </div>
-                            <div className="space-y-2">
-                                <Label>Habitación</Label>
-                                <Select
-                                    value={formData.room_id}
-                                    onValueChange={(value) => setFormData({ ...formData, room_id: value })}
-                                >
-                                    <SelectTrigger className={errors.room_id ? "border-destructive focus-visible:ring-destructive" : ""}>
-                                        <SelectValue placeholder="Seleccionar" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {rooms.map((room) => (
-                                            <SelectItem key={room.id} value={room.id}>
-                                                {room.room_code}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {errors.room_id && <p className="text-xs font-medium text-destructive">{errors.room_id}</p>}
-                            </div>
+                            {!editingIncident && (
+                                <div className="space-y-2">
+                                    <Label>Habitación</Label>
+                                    <Select
+                                        value={formData.room_id}
+                                        onValueChange={(value) => setFormData({ ...formData, room_id: value })}
+                                    >
+                                        <SelectTrigger className={errors.room_id ? "border-destructive focus-visible:ring-destructive" : ""}>
+                                            <SelectValue placeholder="Seleccionar" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {rooms.map((room) => (
+                                                <SelectItem key={room.id} value={room.id}>
+                                                    {room.room_code}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.room_id && <p className="text-xs font-medium text-destructive">{errors.room_id}</p>}
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">
@@ -375,6 +403,16 @@ export default function IncidentsCRUDPage() {
                                         ))}
                                 </SelectContent>
                             </Select>
+                            {editingIncident && editingIncident.assigned_to_id && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => setIsReassignSheetOpen(true)}
+                                >
+                                    Reasignar con buscador
+                                </Button>
+                            )}
                         </div>
 
                         <SheetFooter className="mt-6 px-0">
@@ -383,6 +421,58 @@ export default function IncidentsCRUDPage() {
                             </Button>
                         </SheetFooter>
                     </form>
+                </SheetContent>
+            </Sheet>
+
+            <Sheet open={isReassignSheetOpen} onOpenChange={setIsReassignSheetOpen}>
+                <SheetContent className="sm:max-w-xl overflow-y-auto">
+                    <SheetHeader>
+                        <SheetTitle>Reasignar empleado</SheetTitle>
+                        <SheetDescription>
+                            Busca por nombre y selecciona un nuevo responsable.
+                        </SheetDescription>
+                    </SheetHeader>
+                    <div className="space-y-4 px-4 py-4">
+                        <Input
+                            placeholder="Buscar empleado por nombre..."
+                            value={employeeSearch}
+                            onChange={(e) => setEmployeeSearch(e.target.value)}
+                        />
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Nombre</TableHead>
+                                        <TableHead>Rol</TableHead>
+                                        <TableHead className="w-[120px]">Acción</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {employees
+                                        .filter((emp) => (emp.full_name || "").toLowerCase().includes(employeeSearch.toLowerCase()))
+                                        .map((emp) => (
+                                            <TableRow key={emp.id}>
+                                                <TableCell>{emp.full_name || "Sin nombre"}</TableCell>
+                                                <TableCell className="capitalize">{emp.role}</TableCell>
+                                                <TableCell>
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant={formData.assigned_to === emp.id ? "default" : "outline"}
+                                                        onClick={() => {
+                                                            setFormData({ ...formData, assigned_to: emp.id })
+                                                            setIsReassignSheetOpen(false)
+                                                        }}
+                                                    >
+                                                        Seleccionar
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </div>
                 </SheetContent>
             </Sheet>
         </div>

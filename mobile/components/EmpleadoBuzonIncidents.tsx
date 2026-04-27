@@ -183,6 +183,7 @@ export const EmpleadoBuzonIncidents = () => {
   const loadIncidents = async () => {
     try {
       setLoading(true);
+      const runId = `buzon-load-${Date.now()}`;
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -207,11 +208,14 @@ export const EmpleadoBuzonIncidents = () => {
       const { data, error } = await supabase
         .from("incidents")
         .select(
-          "id, title, description, priority, status, created_at, areas(name), rooms(room_code)",
+          "id, title, description, priority, status, assigned_to, created_at, areas(name), rooms(room_code)",
         )
         .eq("status", "pendiente")
         .eq("area_id", areaData.id)
         .order("created_at", { ascending: false });
+      // #region agent log
+      fetch('http://127.0.0.1:7691/ingest/06b09fcc-a127-44b1-b180-d825926153c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'af572f'},body:JSON.stringify({sessionId:'af572f',runId,hypothesisId:'H2',location:'mobile/components/EmpleadoBuzonIncidents.tsx:loadIncidents',message:'Buzon query result snapshot',data:{userId:user.id,areaId:areaData.id,count:data?.length||0,hasError:Boolean(error),errorMessage:error?.message||null,sample:(data||[]).slice(0,3).map((i:any)=>({id:i.id,status:i.status,assigned_to:i.assigned_to??null,priority:i.priority}))},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       if (error) throw error;
       setIncidents((data || []) as unknown as Incident[]);
